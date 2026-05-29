@@ -2,6 +2,8 @@
 
 **An MCP server that gives AI coding assistants the context to make safe dependency decisions** — and a policy guardrail that returns an `ALLOW / WARN / BLOCK` verdict an agent or CI step can act on.
 
+DepsGuard is a compact AI-native SDLC demonstrator: it exposes dependency intelligence through MCP, gives agents executable guardrails before dependency changes, evaluates its own tool behavior through CI, and demonstrates human-in-the-loop approval with LangGraph.
+
 Built for an **AI-native SDLC**: when Claude Code, Cursor, or Copilot is about to add or upgrade a dependency, DepsGuard feeds it decision-grade data from [Google's deps.dev](https://deps.dev) — licenses, source, and the OSV/GHSA security advisories affecting that exact version. Ships with an **agent skill**, an **evaluation harness**, a **Dockerfile**, and **CI**.
 
 Covers 7 ecosystems including the ones automotive/systems software ships in — **Cargo (Rust)** and **Maven (Java/Kotlin)** — plus npm, PyPI, Go, NuGet, RubyGems. **No API key. No account. Free.**
@@ -26,13 +28,13 @@ This project demonstrates:
 
 ## Demo
 
-No demo asset is checked in yet. To exercise the flow manually, connect the
-server to an MCP client and ask:
+See [`docs/demo.md`](docs/demo.md) for a real terminal transcript showing:
 
-> *"Is urllib3 1.26.4 safe to use? What CVEs affect it?"*
-
-The expected flow is: call `get_version_details`, inspect the advisory IDs, then
-call `get_advisory_details` for CVEs and severity.
+- `urllib3` 1.26.4 proposed as a dependency change
+- a direct DepsGuard policy call
+- deps.dev advisories found for that exact version
+- `BLOCK` with `--max-severity medium`
+- a PR-style dependency risk report
 
 ## What it does
 
@@ -132,6 +134,150 @@ Each tool is a thin, typed wrapper over a single deps.dev v3 REST endpoint, retu
 4. `BLOCK` stops the change.
 5. `WARN` triggers a human approval step.
 6. The workflow emits a PR-style dependency risk report.
+
+### Practical Claude workflow
+
+A practical setup would look like this:
+
+```mermaid
+flowchart TD
+    Developer["Developer asks Claude to add or upgrade a dependency"]
+    Claude["Claude proposes a package and version"]
+    Gate["LangGraph dependency gate"]
+    Server["DepsGuard MCP server"]
+    Data["deps.dev / OSV advisory and license data"]
+    Verdict{"ALLOW / WARN / BLOCK"}
+    Apply["Claude applies the dependency change"]
+    Human["Human approval required"]
+    Stop["Claude stops or suggests a safer version"]
+    Report["PR summary includes the dependency gate report"]
+
+    Developer --> Claude
+    Claude --> Gate
+    Gate --> Server
+    Server --> Data
+    Data --> Server
+    Server --> Gate
+    Gate --> Verdict
+    Verdict -->|ALLOW| Apply
+    Verdict -->|WARN| Human
+    Human -->|approved| Apply
+    Human -->|rejected| Stop
+    Verdict -->|BLOCK| Stop
+    Apply --> Report
+    Stop --> Report
+```
+
+Example Claude prompt:
+
+```text
+Upgrade urllib3 to 1.26.4.
+
+Before changing files:
+1. Run the DepsGuard LangGraph dependency gate.
+2. If the result is ALLOW, apply the change.
+3. If the result is WARN, stop and ask me for approval.
+4. If the result is BLOCK, do not apply the change. Explain why and suggest a safer version.
+5. Include the dependency gate report in the PR summary.
+```
+
+Claude runs the workflow:
+
+```powershell
+uv run python examples/langgraph_dependency_gate.py pypi urllib3 1.26.4 --max-severity medium --json
+```
+
+Behind the scenes:
+
+```text
+Claude wants to change dependency
+        |
+LangGraph receives package/version
+        |
+LangGraph calls DepsGuard through MCP
+        |
+DepsGuard checks deps.dev / OSV advisory data
+        |
+DepsGuard returns verdict
+        |
+LangGraph converts verdict into final action/report
+        |
+Claude acts on that decision
+```
+
+If DepsGuard returns `BLOCK`, Claude should respond like:
+
+```text
+I did not update urllib3 to 1.26.4.
+
+DepsGuard blocked the change because the selected version has advisories above
+the configured policy threshold.
+
+Required action:
+Use a safer version or route this through security review.
+
+Dependency gate result:
+- Package: pypi:urllib3@1.26.4
+- Verdict: BLOCK
+- Worst severity: high
+- Policy max severity: medium
+```
+
+If DepsGuard returns `WARN`, Claude should pause:
+
+```text
+DepsGuard returned WARN for this dependency change.
+
+I need human approval before applying it.
+
+Package: pypi:example@1.2.3
+Reason: advisory severity is within warning range
+Recommended action: approve only if this dependency is required and risk is accepted.
+
+Approve this change?
+```
+
+If approved, Claude continues. If rejected, Claude stops or proposes another
+version.
+
+If DepsGuard returns `ALLOW`, Claude applies the change and includes a PR note
+like:
+
+```markdown
+## Dependency Gate Report
+
+- Package: `pypi:example@1.2.3`
+- DepsGuard verdict: `ALLOW`
+- Final verdict: `ALLOW`
+- Required agent action: Apply the dependency change.
+
+No blocking advisories were found under the configured policy.
+```
+
+In CI, the same workflow can become a required check:
+
+```text
+Pull request opened
+        |
+CI extracts changed dependencies
+        |
+CI runs LangGraph dependency gate
+        |
+ALLOW -> green check
+WARN  -> pending/manual approval
+BLOCK -> red check, merge blocked
+```
+
+So the real value is that Claude is no longer just "being careful" in natural
+language. The dependency decision becomes an enforced workflow: Claude proposes,
+DepsGuard evaluates, LangGraph routes, and the final report becomes part of the
+PR record.
+
+The final action is deterministic:
+
+- `ALLOW` lets Claude continue and include the report in the PR summary.
+- `WARN` pauses for human approval before Claude applies the change.
+- `BLOCK` prevents the change and tells Claude to propose a safer version or route to security review.
 
 Run:
 

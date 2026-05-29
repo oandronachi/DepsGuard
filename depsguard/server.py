@@ -38,14 +38,20 @@ async def _get(path: str) -> dict[str, Any]:
     tools even if the network is down. Raises a clean message on 404 / errors.
     """
     url = f"{API_BASE}/{path}"
-    async with httpx.AsyncClient(timeout=TIMEOUT, headers={"User-Agent": USER_AGENT}) as client:
+    async with httpx.AsyncClient(
+        timeout=TIMEOUT,
+        headers={"User-Agent": USER_AGENT},
+    ) as client:
         try:
             resp = await client.get(url)
         except httpx.RequestError as exc:
             raise RuntimeError(f"Could not reach deps.dev: {exc}") from exc
 
     if resp.status_code == 404:
-        raise RuntimeError("Not found on deps.dev. Check the ecosystem, name, and version (names are case-sensitive; deps.dev only indexes published releases).")
+        raise RuntimeError(
+            "Not found on deps.dev. Check the ecosystem, name, and version "
+            "(names are case-sensitive; deps.dev only indexes published releases)."
+        )
     if resp.status_code == 429:
         raise RuntimeError("deps.dev is rate-limiting right now. Wait a moment and retry.")
     resp.raise_for_status()
@@ -56,7 +62,8 @@ def _sys(ecosystem: str) -> str:
     eco = ecosystem.strip().lower()
     valid = {"pypi", "npm", "cargo", "maven", "go", "nuget", "rubygems"}
     if eco not in valid:
-        raise ValueError(f"Unknown ecosystem '{ecosystem}'. Use one of: {', '.join(sorted(valid))}.")
+        valid_list = ", ".join(sorted(valid))
+        raise ValueError(f"Unknown ecosystem '{ecosystem}'. Use one of: {valid_list}.")
     return eco.upper()
 
 
@@ -68,7 +75,8 @@ _MAX_CONCURRENT_ADVISORY_LOOKUPS = 8
 
 
 def _severity_from_score(score: Any) -> str:
-    if isinstance(score, (int, float)) and score > 0:   # 0 = "no v3 score" on deps.dev
+    # deps.dev uses 0 for "no v3 score".
+    if isinstance(score, (int, float)) and score > 0:
         if score >= 9.0:
             return "critical"
         if score >= 7.0:
@@ -129,7 +137,11 @@ async def get_package_info(ecosystem: Ecosystem, name: str) -> dict[str, Any]:
 
 
 @mcp.tool()
-async def get_version_details(ecosystem: Ecosystem, name: str, version: str) -> dict[str, Any]:
+async def get_version_details(
+    ecosystem: Ecosystem,
+    name: str,
+    version: str,
+) -> dict[str, Any]:
     """Get licenses, source links, and KNOWN SECURITY ADVISORIES for one exact version.
 
     Use this when the user asks "is X@VERSION safe?", "what license does
@@ -145,7 +157,11 @@ async def get_version_details(ecosystem: Ecosystem, name: str, version: str) -> 
     version: the exact version string (e.g. "2.31.0").
     """
     system = _sys(ecosystem)
-    data = await _get(f"systems/{system}/packages/{quote(name, safe='')}/versions/{quote(version, safe='')}")
+    encoded_name = quote(name, safe="")
+    encoded_version = quote(version, safe="")
+    data = await _get(
+        f"systems/{system}/packages/{encoded_name}/versions/{encoded_version}"
+    )
     advisory_ids = [a.get("id") for a in data.get("advisoryKeys", []) if a.get("id")]
     source = next(
         (l.get("url") for l in data.get("links", []) if l.get("label") == "SOURCE_REPO"),
@@ -219,7 +235,10 @@ async def evaluate_dependency_policy(
         (default "high" blocks only "critical"; set "low" to block anything).
     """
     if max_severity not in _SEVERITY_ORDER:
-        raise ValueError(f"Unknown max_severity '{max_severity}'. Use one of: {', '.join(_SEVERITY_ORDER)}.")
+        valid_list = ", ".join(_SEVERITY_ORDER)
+        raise ValueError(
+            f"Unknown max_severity '{max_severity}'. Use one of: {valid_list}."
+        )
 
     details = await get_version_details(ecosystem, name, version)
     threshold = _SEVERITY_ORDER.index(max_severity)
@@ -232,7 +251,9 @@ async def evaluate_dependency_policy(
         async with sem:
             return await get_advisory_details(aid)
 
-    adv_records = await asyncio.gather(*(_expand(aid) for aid in details["advisory_ids"]))
+    adv_records = await asyncio.gather(
+        *(_expand(aid) for aid in details["advisory_ids"])
+    )
 
     advisories: list[dict[str, Any]] = []
     worst_rank = -1
@@ -243,16 +264,29 @@ async def evaluate_dependency_policy(
         if rank > worst_rank:
             worst_rank = rank
             worst_severity = sev
-        advisories.append({"id": adv["id"], "severity": sev, "title": adv["title"], "url": adv["url"]})
+        advisories.append(
+            {
+                "id": adv["id"],
+                "severity": sev,
+                "title": adv["title"],
+                "url": adv["url"],
+            }
+        )
 
     if not advisories:
         verdict, reason = "ALLOW", "No known direct advisories for this version."
     elif worst_rank > threshold:
         verdict = "BLOCK"
-        reason = f"{len(advisories)} advisory(ies); worst severity '{worst_severity}' exceeds policy max '{max_severity}'."
+        reason = (
+            f"{len(advisories)} advisory(ies); worst severity "
+            f"'{worst_severity}' exceeds policy max '{max_severity}'."
+        )
     else:
         verdict = "WARN"
-        reason = f"{len(advisories)} advisory(ies) present but within policy max '{max_severity}'. Review before merging."
+        reason = (
+            f"{len(advisories)} advisory(ies) present but within policy max "
+            f"'{max_severity}'. Review before merging."
+        )
 
     return {
         "verdict": verdict,

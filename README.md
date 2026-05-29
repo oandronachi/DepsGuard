@@ -1,12 +1,23 @@
 # DepsGuard 🛡️
 
-**An MCP server that gives AI coding assistants the context to make safe dependency decisions** — and a policy guardrail that returns an `ALLOW / WARN / BLOCK` verdict an agent or CI step can act on.
+**An MCP server that gives AI coding assistants the context to make safe
+dependency decisions** — and a policy guardrail that returns an
+`ALLOW / WARN / BLOCK` verdict an agent or CI step can act on.
 
-DepsGuard is a compact AI-native SDLC demonstrator: it exposes dependency intelligence through MCP, gives agents executable guardrails before dependency changes, evaluates its own tool behavior through CI, and demonstrates human-in-the-loop approval with LangGraph.
+DepsGuard is a compact AI-native SDLC demonstrator: it exposes dependency
+intelligence through MCP, gives agents executable guardrails before dependency
+changes, evaluates its own tool behavior through CI, and demonstrates
+human-in-the-loop approval with LangGraph.
 
-Built for an **AI-native SDLC**: when Claude Code, Cursor, or Copilot is about to add or upgrade a dependency, DepsGuard feeds it decision-grade data from [Google's deps.dev](https://deps.dev) — licenses, source, and the OSV/GHSA security advisories affecting that exact version. Ships with an **agent skill**, an **evaluation harness**, a **Dockerfile**, and **CI**.
+Built for an **AI-native SDLC**: when Claude Code, Cursor, or Copilot is about
+to add or upgrade a dependency, DepsGuard feeds it decision-grade data from
+[Google's deps.dev](https://deps.dev) — licenses, source, and the OSV/GHSA
+security advisories affecting that exact version. Ships with an **agent skill**,
+an **evaluation harness**, a **Dockerfile**, and **CI**.
 
-Covers 7 ecosystems including the ones automotive/systems software ships in — **Cargo (Rust)** and **Maven (Java/Kotlin)** — plus npm, PyPI, Go, NuGet, RubyGems. **No API key. No account. Free.**
+Covers 7 ecosystems including the ones automotive/systems software ships in —
+**Cargo (Rust)** and **Maven (Java/Kotlin)** — plus npm, PyPI, Go, NuGet,
+RubyGems. **No API key. No account. Free.**
 
 ![Python](https://img.shields.io/badge/python-3.10+-blue)
 ![MCP](https://img.shields.io/badge/MCP-server-7c3aed)
@@ -16,7 +27,9 @@ Covers 7 ecosystems including the ones automotive/systems software ships in — 
 
 ## Why this matters for AI-native SDLC
 
-AI coding assistants can add or upgrade dependencies faster than humans can review their security and licensing implications. DepsGuard gives the assistant a structured tool interface and a policy verdict before code is changed.
+AI coding assistants can add or upgrade dependencies faster than humans can
+review their security and licensing implications. DepsGuard gives the assistant
+a structured tool interface and a policy verdict before code is changed.
 
 This project demonstrates:
 - MCP tool integration for AI coding assistants
@@ -38,16 +51,23 @@ See [`docs/demo.md`](docs/demo.md) for a real terminal transcript showing:
 
 ## What it does
 
-Ask Claude *"is it safe to upgrade to this version?"* and it answers with real advisory data — then gives a verdict it can act on.
+Ask Claude *"is it safe to upgrade to this version?"* and it answers with real
+advisory data — then gives a verdict it can act on.
 
-| Tool | What it returns |
-|------|-----------------|
-| `get_package_info(ecosystem, name)` | Version list, latest/default version, publish dates, deprecation flags |
-| `get_version_details(ecosystem, name, version)` | Licenses, source repo, and **security advisory IDs** affecting that exact version |
-| `get_advisory_details(advisory_id)` | Title, **CVSS severity**, CVE aliases, and a link for an OSV/GHSA advisory |
-| `evaluate_dependency_policy(ecosystem, name, version, max_severity)` | **Guardrail:** composes the above into an `ALLOW / WARN / BLOCK` verdict for a dependency add/upgrade |
+Tools:
 
-The intended flow: look up a version → get its advisory IDs → expand severity → or just call the guardrail for a one-shot decision. The bundled [`SKILL.md`](SKILL.md) teaches an agent exactly when and how to chain them.
+- `get_package_info(ecosystem, name)` returns available versions, default/latest
+  version, publish dates, and deprecation flags.
+- `get_version_details(ecosystem, name, version)` returns licenses, source repo,
+  and advisory IDs affecting that exact version.
+- `get_advisory_details(advisory_id)` returns CVSS severity, CVE aliases, and an
+  OSV/GHSA advisory link.
+- `evaluate_dependency_policy(...)` composes the above into an
+  `ALLOW / WARN / BLOCK` guardrail verdict.
+
+The intended flow: look up a version, get its advisory IDs, expand severity, or
+just call the guardrail for a one-shot decision. The bundled
+[`SKILL.md`](SKILL.md) teaches an agent exactly when and how to chain them.
 
 ## Install & run
 
@@ -64,7 +84,7 @@ Verify it works without a client:
 
 ```bash
 uv run pytest -q                          # offline unit tests
-uv run python -m evals.run_evals          # live eval suite: scores the tools against real packages
+uv run python -m evals.run_evals          # live eval suite
 npx @modelcontextprotocol/inspector uv run depsguard   # interactive tool explorer
 ```
 
@@ -86,7 +106,8 @@ docker run --rm --entrypoint /app/.venv/bin/python depsguard:examples \
 
 ## Connect to Claude
 
-**Claude Desktop** — Settings → Developer → Edit Config, then add (use the **absolute path** to `uv`; find it with `which uv`):
+**Claude Desktop** — Settings → Developer → Edit Config, then add the server
+entry. Use the **absolute path** to `uv`; find it with `which uv`.
 
 ```json
 {
@@ -99,7 +120,9 @@ docker run --rm --entrypoint /app/.venv/bin/python depsguard:examples \
 }
 ```
 
-Fully quit and reopen Claude Desktop. (Restarting is required after editing the config; Desktop also launches with a minimal `PATH`, which is why the absolute path matters.)
+Fully quit and reopen Claude Desktop. Restarting is required after editing the
+config; Desktop also launches with a minimal `PATH`, which is why the absolute
+path matters.
 
 **Claude Code** — one command:
 
@@ -113,20 +136,31 @@ claude mcp add depsguard -- uv --directory /absolute/path/to/DepsGuard run depsg
 - *"What license does `requests` use, and what's the latest version?"*
 - *"Compare the advisories in `lodash` 4.17.11 vs 4.17.21."* (npm)
 - *"Tell me about advisory GHSA-2qrg-x229-3v8q."*
-- *"Is the Maven package `org.apache.logging.log4j:log4j-core` 2.14.1 vulnerable?"*
+- *"Is Maven package `org.apache.logging.log4j:log4j-core` 2.14.1 vulnerable?"*
 
 ## How it works
 
-Each tool is a thin, typed wrapper over a single deps.dev v3 REST endpoint, returning compact structured data (not raw API dumps) so it stays friendly to an agent's context window. The guardrail composes them into a decision. Built with the official [MCP Python SDK](https://github.com/modelcontextprotocol/python-sdk) (FastMCP). The server is **read-only** and makes no destructive or authenticated calls.
+Each tool is a thin, typed wrapper over a single deps.dev v3 REST endpoint,
+returning compact structured data rather than raw API dumps. That keeps output
+friendly to an agent's context window. The guardrail composes the lookup tools
+into a decision. Built with the official
+[MCP Python SDK](https://github.com/modelcontextprotocol/python-sdk) (FastMCP).
+The server is **read-only** and makes no destructive or authenticated calls.
 
 ## Evals & CI
 
-- [`evals/run_evals.py`](evals/run_evals.py) scores the tool surface on a labelled set of real packages — correctness on known-vulnerable versions, cross-ecosystem coverage (Cargo + Maven), and a guardrail consistency invariant — printing aggregate metrics and exiting non-zero on failure.
-- [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs the unit tests on every push/PR; [`.github/workflows/evals.yml`](.github/workflows/evals.yml) runs the live eval suite on demand and weekly, as a feedback loop that catches upstream data/API drift.
+- [`evals/run_evals.py`](evals/run_evals.py) scores the tool surface on real
+  packages: known-vulnerable versions, cross-ecosystem coverage, and a
+  guardrail consistency invariant.
+- [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs unit tests on
+  every push/PR. [`.github/workflows/evals.yml`](.github/workflows/evals.yml)
+  runs the live eval suite on demand and weekly to catch upstream data/API
+  drift.
 
 ## LangGraph dependency gate example
 
-[`examples/langgraph_dependency_gate.py`](examples/langgraph_dependency_gate.py) demonstrates how DepsGuard can be used inside an agentic SDLC workflow:
+[`examples/langgraph_dependency_gate.py`](examples/langgraph_dependency_gate.py)
+demonstrates how DepsGuard can be used inside an agentic SDLC workflow:
 
 1. A proposed dependency add/upgrade enters a LangGraph workflow.
 2. The workflow calls DepsGuard through MCP.
@@ -184,7 +218,10 @@ Before changing files:
 Claude runs the workflow:
 
 ```powershell
-uv run python examples/langgraph_dependency_gate.py pypi urllib3 1.26.4 --max-severity medium --json
+uv run python examples/langgraph_dependency_gate.py `
+  pypi urllib3 1.26.4 `
+  --max-severity medium `
+  --json
 ```
 
 Behind the scenes:
@@ -277,7 +314,8 @@ The final action is deterministic:
 
 - `ALLOW` lets Claude continue and include the report in the PR summary.
 - `WARN` pauses for human approval before Claude applies the change.
-- `BLOCK` prevents the change and tells Claude to propose a safer version or route to security review.
+- `BLOCK` prevents the change and tells Claude to propose a safer version or
+  route to security review.
 
 Run:
 
@@ -292,20 +330,28 @@ uv run python examples/langgraph_dependency_gate.py pypi urllib3 1.26.4 --max-se
 uv run python examples/langgraph_dependency_gate.py pypi urllib3 1.26.4 --transport direct
 
 # Non-interactive approval demo: approve WARN outcomes automatically.
-uv run python examples/langgraph_dependency_gate.py pypi urllib3 1.26.4 --transport mock --auto-approve-warn
+uv run python examples/langgraph_dependency_gate.py pypi urllib3 1.26.4 \
+  --transport mock --auto-approve-warn
 
 # Non-interactive rejection demo: reject WARN outcomes automatically.
-uv run python examples/langgraph_dependency_gate.py pypi urllib3 1.26.4 --transport mock --reject-warn
+uv run python examples/langgraph_dependency_gate.py pypi urllib3 1.26.4 \
+  --transport mock --reject-warn
 ```
 
 ## Limitations & notes
 
-- Advisories reflect those affecting the selected version **directly** — not vulnerabilities inherited from transitive dependencies. Extending the guardrail across a full resolved dependency graph (deps.dev exposes one) and adding OpenSSF Scorecard signals are natural next features; this build scopes to the highest-signal tools.
+- Advisories reflect those affecting the selected version **directly**, not
+  vulnerabilities inherited from transitive dependencies. Extending the
+  guardrail across a full resolved dependency graph and adding OpenSSF Scorecard
+  signals are natural next features; this build scopes to the highest-signal
+  tools.
 - License information is advisory context, not legal advice.
 - The guardrail is intentionally conservative and should be adapted per organization.
-- deps.dev has **no fixed public rate limit**; the server reports HTTP 429 with a clear retry-later error.
+- deps.dev has **no fixed public rate limit**; the server reports HTTP 429 with
+  a clear retry-later error.
 - Live evals depend on upstream deps.dev/OSV data and may detect data drift.
-- deps.dev data is provided by Google under [CC-BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+- deps.dev data is provided by Google under
+  [CC-BY 4.0](https://creativecommons.org/licenses/by/4.0/).
 
 ## License
 

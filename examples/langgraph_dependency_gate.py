@@ -150,7 +150,11 @@ def mock_policy(request: dict[str, Any]) -> dict[str, Any]:
         "url": "https://osv.dev/vulnerability/GHSA-2xpw-w6gg-jr37",
     }
     worst = advisory["severity"]
-    verdict = "BLOCK" if severity_rank(worst) > severity_rank(max_severity) else "WARN"
+    verdict = (
+        "BLOCK"
+        if severity_rank(worst) > severity_rank(max_severity)
+        else "WARN"
+    )
     reason = (
         f"Mock policy: 1 advisory; worst severity '{worst}' exceeds policy max "
         f"'{max_severity}'."
@@ -179,7 +183,10 @@ async def evaluate_policy_node(state: GateState) -> dict[str, Any]:
             "worst_severity": None,
             "licenses": [],
             "advisories": [],
-            "reason": f"DepsGuard policy lookup failed closed: {type(exc).__name__}: {exc}",
+            "reason": (
+                "DepsGuard policy lookup failed closed: "
+                f"{type(exc).__name__}: {exc}"
+            ),
         }
         return {
             "policy": policy,
@@ -211,7 +218,10 @@ def approval_node(state: GateState) -> dict[str, Any]:
         response = interrupt(
             {
                 "kind": "dependency_policy_warning",
-                "message": "DepsGuard returned WARN. A human must approve before proceeding.",
+                "message": (
+                    "DepsGuard returned WARN. A human must approve before "
+                    "proceeding."
+                ),
                 "package": state["policy"].get("package"),
                 "policy": state["policy"],
                 "report": render_report(state, pending=True),
@@ -229,7 +239,13 @@ def coerce_approval(response: Any) -> bool:
     if isinstance(response, bool):
         return response
     if isinstance(response, str):
-        return response.strip().lower() in {"y", "yes", "approve", "approved", "true"}
+        return response.strip().lower() in {
+            "y",
+            "yes",
+            "approve",
+            "approved",
+            "true",
+        }
     if isinstance(response, dict):
         return bool(response.get("approved"))
     return False
@@ -276,7 +292,10 @@ def render_report(state: GateState, pending: bool = False) -> str:
     agent_action = (
         "Wait for a human to approve or reject the WARN result."
         if pending
-        else state.get("agent_action", agent_action_for_policy(policy, state.get("human_approved")))
+        else state.get(
+            "agent_action",
+            agent_action_for_policy(policy, state.get("human_approved")),
+        )
     )
     advisories = policy.get("advisories", [])
     licenses = policy.get("licenses", [])
@@ -289,7 +308,10 @@ def render_report(state: GateState, pending: bool = False) -> str:
         f"- Workflow decision: `{decision}`",
         f"- Status: `{status}`",
         f"- Final verdict: `{final_verdict}`",
-        f"- Policy max severity: `{policy.get('policy_max_severity', state.get('max_severity'))}`",
+        (
+            "- Policy max severity: "
+            f"`{policy.get('policy_max_severity', state.get('max_severity'))}`"
+        ),
         f"- Worst severity: `{policy.get('worst_severity') or 'none'}`",
         f"- Licenses: `{', '.join(licenses) if licenses else 'unknown'}`",
         f"- Reason: {policy.get('reason', 'No reason returned.')}",
@@ -323,7 +345,11 @@ def render_report(state: GateState, pending: bool = False) -> str:
     lines.extend(
         [
             "",
-            "> Note: DepsGuard reports advisories affecting the selected package version directly; it does not resolve the full transitive dependency graph.",
+            (
+                "> Note: DepsGuard reports advisories affecting the selected "
+                "package version directly; it does not resolve the full "
+                "transitive dependency graph."
+            ),
             "",
             "### Final Outcome",
             "",
@@ -367,7 +393,10 @@ def finalize_state(state: GateState) -> GateState:
     }
 
 
-def agent_action_for_policy(policy: dict[str, Any], human_approved: bool | None = None) -> str:
+def agent_action_for_policy(
+    policy: dict[str, Any],
+    human_approved: bool | None = None,
+) -> str:
     verdict = str(policy.get("verdict", "BLOCK")).upper()
     if verdict == "ALLOW":
         return "Proceed with the dependency change and keep the license visible in the PR."
@@ -375,7 +404,10 @@ def agent_action_for_policy(policy: dict[str, Any], human_approved: bool | None 
         if human_approved:
             return "Proceed only because a human explicitly approved the WARN result."
         return "Do not apply the dependency change until a human approves the WARN result."
-    return "Do not apply the dependency change. Propose a safer version or route to security review."
+    return (
+        "Do not apply the dependency change. Propose a safer version or route "
+        "to security review."
+    )
 
 
 def package_label(state: GateState) -> str:
@@ -467,13 +499,27 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Run a LangGraph dependency gate backed by DepsGuard.",
     )
-    parser.add_argument("ecosystem", choices=["pypi", "npm", "cargo", "maven", "go", "nuget", "rubygems"])
+    parser.add_argument(
+        "ecosystem",
+        choices=["pypi", "npm", "cargo", "maven", "go", "nuget", "rubygems"],
+    )
     parser.add_argument("name")
     parser.add_argument("version")
     parser.add_argument("--max-severity", choices=SEVERITY_ORDER, default="high")
-    parser.add_argument("--transport", choices=["stdio", "direct", "mock"], default="stdio")
-    parser.add_argument("--thread-id", help="LangGraph checkpoint thread_id. Defaults to a package-derived ID.")
-    parser.add_argument("--server-command", default="uv", help="MCP stdio server command for --transport stdio.")
+    parser.add_argument(
+        "--transport",
+        choices=["stdio", "direct", "mock"],
+        default="stdio",
+    )
+    parser.add_argument(
+        "--thread-id",
+        help="LangGraph checkpoint thread_id. Defaults to a package-derived ID.",
+    )
+    parser.add_argument(
+        "--server-command",
+        default="uv",
+        help="MCP stdio server command for --transport stdio.",
+    )
     parser.add_argument(
         "--server-arg",
         action="append",
@@ -481,9 +527,21 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     )
 
     approval = parser.add_mutually_exclusive_group()
-    approval.add_argument("--auto-approve-warn", action="store_true", help="Approve WARN results without interrupting.")
-    approval.add_argument("--reject-warn", action="store_true", help="Reject WARN results without interrupting.")
-    parser.add_argument("--json", action="store_true", help="Print the final graph state as JSON instead of Markdown.")
+    approval.add_argument(
+        "--auto-approve-warn",
+        action="store_true",
+        help="Approve WARN results without interrupting.",
+    )
+    approval.add_argument(
+        "--reject-warn",
+        action="store_true",
+        help="Reject WARN results without interrupting.",
+    )
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Print the final graph state as JSON instead of Markdown.",
+    )
     return parser.parse_args(argv)
 
 

@@ -14,8 +14,15 @@ import depsguard.server as server
 _PKG = {
     "packageKey": {"system": "PYPI", "name": "requests"},
     "versions": [
-        {"versionKey": {"name": "requests", "version": "2.31.0"}, "publishedAt": "2023-05-22T00:00:00Z", "isDefault": True},
-        {"versionKey": {"name": "requests", "version": "2.30.0"}, "publishedAt": "2023-05-03T00:00:00Z"},
+        {
+            "versionKey": {"name": "requests", "version": "2.31.0"},
+            "publishedAt": "2023-05-22T00:00:00Z",
+            "isDefault": True,
+        },
+        {
+            "versionKey": {"name": "requests", "version": "2.30.0"},
+            "publishedAt": "2023-05-03T00:00:00Z",
+        },
     ],
 }
 _VER = {
@@ -47,7 +54,11 @@ class _FakeResponse:
         if self.status_code >= 400:
             request = httpx.Request("GET", "https://api.deps.dev/v3/test")
             response = httpx.Response(self.status_code, request=request)
-            raise httpx.HTTPStatusError("HTTP error", request=request, response=response)
+            raise httpx.HTTPStatusError(
+                "HTTP error",
+                request=request,
+                response=response,
+            )
 
 
 class _FakeAsyncClient:
@@ -103,7 +114,10 @@ async def test_get_reports_not_found_with_actionable_message():
     with patch.object(
         server.httpx,
         "AsyncClient",
-        lambda **kwargs: _FakeAsyncClient(response=_FakeResponse(status_code=404), **kwargs),
+        lambda **kwargs: _FakeAsyncClient(
+            response=_FakeResponse(status_code=404),
+            **kwargs,
+        ),
     ):
         with pytest.raises(RuntimeError, match="Not found on deps.dev"):
             await server._get("systems/PYPI/packages/nope")
@@ -114,7 +128,10 @@ async def test_get_reports_rate_limit_without_raw_http_error():
     with patch.object(
         server.httpx,
         "AsyncClient",
-        lambda **kwargs: _FakeAsyncClient(response=_FakeResponse(status_code=429), **kwargs),
+        lambda **kwargs: _FakeAsyncClient(
+            response=_FakeResponse(status_code=429),
+            **kwargs,
+        ),
     ):
         with pytest.raises(RuntimeError, match="rate-limiting"):
             await server._get("systems/PYPI/packages/requests")
@@ -136,7 +153,11 @@ async def test_get_wraps_network_errors():
 
 @pytest.mark.asyncio
 async def test_get_package_info():
-    with patch.object(server, "_get", _router({"package": _PKG, "version": _VER, "advisory": _ADV})):
+    with patch.object(
+        server,
+        "_get",
+        _router({"package": _PKG, "version": _VER, "advisory": _ADV}),
+    ):
         out = await server.get_package_info("pypi", "requests")
     assert out["total_versions"] == 2
     assert out["default_version"] == "2.31.0"
@@ -148,11 +169,18 @@ async def test_get_package_info_allows_packages_without_default_version():
     no_default = {
         "packageKey": {"system": "PYPI", "name": "example"},
         "versions": [
-            {"versionKey": {"name": "example", "version": "1.0.0"}, "publishedAt": "2024-01-01T00:00:00Z"},
+            {
+                "versionKey": {"name": "example", "version": "1.0.0"},
+                "publishedAt": "2024-01-01T00:00:00Z",
+            },
         ],
     }
 
-    with patch.object(server, "_get", _router({"package": no_default, "version": _VER, "advisory": _ADV})):
+    with patch.object(
+        server,
+        "_get",
+        _router({"package": no_default, "version": _VER, "advisory": _ADV}),
+    ):
         out = await server.get_package_info("pypi", "example")
 
     assert out["default_version"] is None
@@ -165,7 +193,10 @@ async def test_get_package_info_percent_encodes_scoped_npm_package_names():
 
     async def _fake(path):
         paths.append(path)
-        return {"packageKey": {"system": "NPM", "name": "@colors/colors"}, "versions": []}
+        return {
+            "packageKey": {"system": "NPM", "name": "@colors/colors"},
+            "versions": [],
+        }
 
     with patch.object(server, "_get", _fake):
         await server.get_package_info("npm", "@colors/colors")
@@ -175,7 +206,11 @@ async def test_get_package_info_percent_encodes_scoped_npm_package_names():
 
 @pytest.mark.asyncio
 async def test_get_version_details_surfaces_advisories():
-    with patch.object(server, "_get", _router({"package": _PKG, "version": _VER, "advisory": _ADV})):
+    with patch.object(
+        server,
+        "_get",
+        _router({"package": _PKG, "version": _VER, "advisory": _ADV}),
+    ):
         out = await server.get_version_details("pypi", "urllib3", "1.26.4")
     assert out["licenses"] == ["MIT"]
     assert out["advisory_count"] == 1
@@ -208,13 +243,19 @@ async def test_get_version_details_percent_encodes_maven_coordinates_and_version
         )
 
     assert paths == [
-        "systems/MAVEN/packages/org.apache.logging.log4j%3Alog4j-core/versions/2.14.1%2Bbuild%2Fmetadata"
+        "systems/MAVEN/packages/"
+        "org.apache.logging.log4j%3Alog4j-core/"
+        "versions/2.14.1%2Bbuild%2Fmetadata"
     ]
 
 
 @pytest.mark.asyncio
 async def test_get_advisory_details_severity_bucketing():
-    with patch.object(server, "_get", _router({"package": _PKG, "version": _VER, "advisory": _ADV})):
+    with patch.object(
+        server,
+        "_get",
+        _router({"package": _PKG, "version": _VER, "advisory": _ADV}),
+    ):
         out = await server.get_advisory_details("GHSA-5phf-px7c-ng8b")
     assert out["cvss3_score"] == 7.5
     assert out["severity"] == "high"
@@ -245,7 +286,11 @@ async def test_get_advisory_details_unknown_when_cvss_missing():
         "url": "https://osv.dev/vulnerability/GHSA-unknown",
     }
 
-    with patch.object(server, "_get", _router({"package": _PKG, "version": _VER, "advisory": no_score})):
+    with patch.object(
+        server,
+        "_get",
+        _router({"package": _PKG, "version": _VER, "advisory": no_score}),
+    ):
         out = await server.get_advisory_details("GHSA-unknown")
 
     assert out["severity"] == "unknown"
@@ -271,7 +316,12 @@ def _policy_router(version_payload, advisory_payload):
 @pytest.mark.asyncio
 async def test_policy_blocks_when_severity_exceeds_threshold():
     with patch.object(server, "_get", _policy_router(_VER, _ADV)):
-        out = await server.evaluate_dependency_policy("pypi", "urllib3", "1.26.4", max_severity="medium")
+        out = await server.evaluate_dependency_policy(
+            "pypi",
+            "urllib3",
+            "1.26.4",
+            max_severity="medium",
+        )
     assert out["verdict"] == "BLOCK"
     assert out["worst_severity"] == "high"
 
@@ -279,13 +329,23 @@ async def test_policy_blocks_when_severity_exceeds_threshold():
 @pytest.mark.asyncio
 async def test_policy_warns_within_threshold():
     with patch.object(server, "_get", _policy_router(_VER, _ADV)):
-        out = await server.evaluate_dependency_policy("pypi", "urllib3", "1.26.4", max_severity="high")
+        out = await server.evaluate_dependency_policy(
+            "pypi",
+            "urllib3",
+            "1.26.4",
+            max_severity="high",
+        )
     assert out["verdict"] == "WARN"
 
 
 @pytest.mark.asyncio
 async def test_policy_allows_when_clean():
-    clean = {"versionKey": {"name": "requests", "version": "2.31.0"}, "licenses": ["Apache-2.0"], "advisoryKeys": [], "links": []}
+    clean = {
+        "versionKey": {"name": "requests", "version": "2.31.0"},
+        "licenses": ["Apache-2.0"],
+        "advisoryKeys": [],
+        "links": [],
+    }
     with patch.object(server, "_get", _policy_router(clean, _ADV)):
         out = await server.evaluate_dependency_policy("pypi", "requests", "2.31.0")
     assert out["verdict"] == "ALLOW"
@@ -299,7 +359,12 @@ async def test_policy_rejects_invalid_max_severity():
 
     with patch.object(server, "_get", _fail_if_called):
         with pytest.raises(ValueError, match="Unknown max_severity"):
-            await server.evaluate_dependency_policy("pypi", "urllib3", "1.26.4", max_severity="severe")
+            await server.evaluate_dependency_policy(
+                "pypi",
+                "urllib3",
+                "1.26.4",
+                max_severity="severe",
+            )
 
 
 @pytest.mark.asyncio
@@ -318,7 +383,12 @@ async def test_policy_preserves_unknown_worst_severity_label():
     }
 
     with patch.object(server, "_get", _policy_router(version, unknown_advisory)):
-        out = await server.evaluate_dependency_policy("pypi", "demo", "1.0.0", max_severity="low")
+        out = await server.evaluate_dependency_policy(
+            "pypi",
+            "demo",
+            "1.0.0",
+            max_severity="low",
+        )
 
     assert out["verdict"] == "BLOCK"
     assert out["worst_severity"] == "unknown"

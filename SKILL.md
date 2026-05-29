@@ -1,6 +1,12 @@
 ---
 name: dependency-guardrail
-description: Use whenever you are about to add, upgrade, or evaluate a third-party dependency in any ecosystem (PyPI, npm, Cargo/Rust, Maven/Java-Kotlin, Go, NuGet, RubyGems), or when a user asks whether a package or version is safe, what license it uses, or which CVEs affect it. Provides decision-grade dependency context and an ALLOW/WARN/BLOCK policy verdict via the DepsGuard MCP server.
+description: >-
+  Use whenever you are about to add, upgrade, or evaluate a third-party
+  dependency in any ecosystem (PyPI, npm, Cargo/Rust, Maven/Java-Kotlin, Go,
+  NuGet, RubyGems), or when a user asks whether a package or version is safe,
+  what license it uses, or which CVEs affect it. Provides decision-grade
+  dependency context and an ALLOW/WARN/BLOCK policy verdict via the DepsGuard
+  MCP server.
 ---
 
 # Dependency Guardrail

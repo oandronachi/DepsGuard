@@ -41,10 +41,13 @@ class Case:
 
 
 async def _vulnerable_version_is_flagged() -> Result:
-    """urllib3 1.26.4 has a long-standing high-severity advisory (CVE-2021-33503)."""
+    """urllib3 1.26.4 has long-standing security advisories."""
     out = await server.get_version_details("pypi", "urllib3", "1.26.4")
     ok = out["advisory_count"] >= 1 and "MIT" in out["licenses"]
-    return Result(ok, f"advisory_count={out['advisory_count']}, licenses={out['licenses']}")
+    return Result(
+        ok,
+        f"advisory_count={out['advisory_count']}, licenses={out['licenses']}",
+    )
 
 
 async def _package_listing_is_well_formed() -> Result:
@@ -54,14 +57,26 @@ async def _package_listing_is_well_formed() -> Result:
         and out["total_versions"] > 0
         and isinstance(out["default_version"], str)
     )
-    return Result(ok, f"name={out['name']}, total_versions={out['total_versions']}, default={out['default_version']}")
+    return Result(
+        ok,
+        (
+            f"name={out['name']}, total_versions={out['total_versions']}, "
+            f"default={out['default_version']}"
+        ),
+    )
 
 
 async def _advisory_details_resolve() -> Result:
     """First advisory on the vulnerable version must expand to a usable record."""
     ver = await server.get_version_details("pypi", "urllib3", "1.26.4")
     adv = await server.get_advisory_details(ver["advisory_ids"][0])
-    ok = adv["severity"] in {"low", "medium", "high", "critical", "unknown"} and bool(adv["url"])
+    ok = adv["severity"] in {
+        "low",
+        "medium",
+        "high",
+        "critical",
+        "unknown",
+    } and bool(adv["url"])
     return Result(ok, f"id={adv['id']}, severity={adv['severity']}")
 
 
@@ -74,23 +89,46 @@ async def _cargo_ecosystem_reachable() -> Result:
 
 async def _maven_ecosystem_reachable() -> Result:
     """Coverage check for Java/Kotlin/Maven."""
-    out = await server.get_version_details("maven", "com.google.guava:guava", "33.0.0-jre")
+    out = await server.get_version_details(
+        "maven",
+        "com.google.guava:guava",
+        "33.0.0-jre",
+    )
     ok = out["version"] == "33.0.0-jre" and isinstance(out["licenses"], list)
     return Result(ok, f"version={out['version']}, licenses={out['licenses']}")
 
 
 async def _guardrail_is_consistent() -> Result:
     """Invariant: the guardrail verdict must agree with the advisory data it saw."""
-    v = await server.evaluate_dependency_policy("pypi", "urllib3", "1.26.4", max_severity="low")
+    v = await server.evaluate_dependency_policy(
+        "pypi",
+        "urllib3",
+        "1.26.4",
+        max_severity="low",
+    )
     has_adv = len(v["advisories"]) > 0
     # With max_severity='low', any advisory must produce WARN or BLOCK, never ALLOW.
     ok = (v["verdict"] != "ALLOW") if has_adv else (v["verdict"] == "ALLOW")
-    return Result(ok, f"verdict={v['verdict']}, advisories={len(v['advisories'])}, worst={v['worst_severity']}")
+    return Result(
+        ok,
+        (
+            f"verdict={v['verdict']}, advisories={len(v['advisories'])}, "
+            f"worst={v['worst_severity']}"
+        ),
+    )
 
 
 CASES: list[Case] = [
-    Case("vulnerable_version_is_flagged", "correctness", _vulnerable_version_is_flagged),
-    Case("package_listing_is_well_formed", "correctness", _package_listing_is_well_formed),
+    Case(
+        "vulnerable_version_is_flagged",
+        "correctness",
+        _vulnerable_version_is_flagged,
+    ),
+    Case(
+        "package_listing_is_well_formed",
+        "correctness",
+        _package_listing_is_well_formed,
+    ),
     Case("advisory_details_resolve", "correctness", _advisory_details_resolve),
     Case("cargo_ecosystem_reachable", "coverage", _cargo_ecosystem_reachable),
     Case("maven_ecosystem_reachable", "coverage", _maven_ecosystem_reachable),

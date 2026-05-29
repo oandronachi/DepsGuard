@@ -338,6 +338,21 @@ uv run python examples/langgraph_dependency_gate.py pypi urllib3 1.26.4 \
   --transport mock --reject-warn
 ```
 
+## Future extension: A2A
+
+DepsGuard currently focuses on the MCP tool and guardrail layer: an AI
+assistant or workflow can call DepsGuard to evaluate dependency risk before
+allowing a package change to proceed.
+
+In a larger enterprise SDLC, this could be extended with an A2A-compatible
+dependency-review agent. That agent could coordinate with separate security,
+license-compliance, build-validation, and PR-generation agents, while using
+DepsGuard as the MCP-backed policy tool for dependency intelligence.
+
+This would keep DepsGuard small and focused: it remains the executable
+dependency-policy service, while A2A handles cross-agent coordination across
+the wider engineering workflow.
+
 ## Limitations & notes
 
 - Advisories reflect those affecting the selected version **directly**, not

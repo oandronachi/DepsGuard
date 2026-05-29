@@ -1,0 +1,49 @@
+[project]
+name = "depsguard"
+version = "0.1.0"
+description = "An MCP server that gives AI coding assistants decision-grade dependency context (licenses, CVEs) plus an ALLOW/WARN/BLOCK policy guardrail — context engineering for an AI-native SDLC. Covers Cargo, Maven, npm, PyPI, Go, NuGet, RubyGems. No API key."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Ovidiu Andronachi" }]
+keywords = ["mcp", "model-context-protocol", "agentic", "ai-sdlc", "context-engineering", "guardrails", "evals", "supply-chain", "deps.dev", "claude-code"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Topic :: Security",
+]
+dependencies = [
+    "mcp>=1.2.0",
+    "httpx>=0.27",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pytest-asyncio>=0.23"]
+examples = ["langgraph>=1.2.2"]
+
+[project.scripts]
+depsguard = "depsguard.server:main"
+
+[project.urls]
+Homepage = "https://github.com/oandronachi/DepsGuard"
+Issues = "https://github.com/oandronachi/DepsGuard/issues"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+# Everything installs under the `depsguard` package, so no generic top-level
+# names (server, evals, examples, SKILL.md) land in site-packages. The eval
+# harness, examples, and SKILL.md live at the repo root for dev/CI and are
+# vendored into the package at build time.
+packages = ["depsguard"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"evals" = "depsguard/evals"
+"examples" = "depsguard/examples"
+"SKILL.md" = "depsguard/SKILL.md"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

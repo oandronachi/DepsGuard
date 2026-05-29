@@ -1,0 +1,24 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      UV_PYTHON: "3.12"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+      - name: Install Python
+        run: uv python install ${{ env.UV_PYTHON }}
+      - name: Check lockfile
+        run: uv lock --check --python ${{ env.UV_PYTHON }}
+      - name: Install dependencies
+        run: uv sync --locked --extra dev --extra examples --python ${{ env.UV_PYTHON }}
+      - name: Run unit tests
+        run: uv run --locked --python ${{ env.UV_PYTHON }} pytest -q

@@ -1,0 +1,24 @@
+name: evals
+
+# Live evaluation of the tool surface against deps.dev. Run on demand, and
+# weekly, so drift in the upstream data or API is caught as a feedback loop.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 6 * * 1" # Mondays 06:00 UTC
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    env:
+      UV_PYTHON: "3.12"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: Install Python
+        run: uv python install ${{ env.UV_PYTHON }}
+      - name: Check lockfile
+        run: uv lock --check --python ${{ env.UV_PYTHON }}
+      - run: uv sync --locked --extra dev --python ${{ env.UV_PYTHON }}
+      - name: Run evaluation suite (hits live deps.dev)
+        run: uv run --locked --python ${{ env.UV_PYTHON }} python -m evals.run_evals
